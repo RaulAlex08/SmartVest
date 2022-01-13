@@ -152,7 +152,7 @@ void riesgoDistancias(long distTS, long distBS){
   float alturaOmbligo = alturaUser / 1.618; // El valor 1.618 es el número áureo phi=1.61803398... https://www.comocubriruncuerpo.org/medidas-verticales-a-partir-de-la-estatura/
   long distSegura = alturaOmbligo / cos(alpha);
 
-  if(distTS < 150){
+  if(distTS < 200){
     Serial.println("Riesgo Distancia TS");
     avisoZumb();
   }
