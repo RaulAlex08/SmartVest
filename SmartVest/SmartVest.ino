@@ -17,11 +17,11 @@ PubSubClient client(thingsBoard);
 const char* mqtt_server = "demo.thingsboard.io";
 const char* TOPIC_T = "v1/devices/me/telemetry";
 const char* TOPIC_A = "v1/devices/me/attributes";
-const char* token_sensor = "ezFZ9fWSbSBbCVMynTFG";
-const char* token_pulsador = "ptERkUKriZQLQ2Pheiqu";
-const char* token_tracker = "xtq1k3JGjoGNJt86hY0m";
-const char* token_id_user = "218963084";
-#define TOKEN_BOT "2065123278:AAHlaf3gKAg11jGD6aJQuq_hXFX65rE6MZc"
+const char* token_sensor = "xxxxxxxxxxxxxxxxxxxxxx";
+const char* token_pulsador = "xxxxxxxxxxxxxxxxxxxx";
+const char* token_tracker = "xxxxxxxxxxxxxxxxxxxxxx";
+const char* token_id_user = "xxxxxxx";
+#define TOKEN_BOT "xxxxxxx:xxxxxxxxxxxxxxxxxxxxxxxxxxx"
 
 // Sensor 1
 const byte trig1 = 12; //Pin GPIO12 para el Trigger (Blanco)
