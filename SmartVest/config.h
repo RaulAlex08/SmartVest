@@ -1,5 +1,5 @@
-const char* ssid     = "AndroidAP9005";
-const char* password = "44dd025adb09";
+const char* ssid     = "xxxxxxxxxxxx";
+const char* password = "xxxxxxxxxxxxx";
 const char* hostname = "ESP32_SmartVest";
 
 IPAddress ip(192, 168, 1, 200);
