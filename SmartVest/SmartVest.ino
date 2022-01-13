@@ -4,7 +4,6 @@
 #include <Adafruit_GPS.h>
 #include <ArduinoOTA.h>
 #include <Thread.h>
-//#include <SoftwareSerial.h>
 #include <UniversalTelegramBot.h>
 #include <ArduinoJson.h>
 
@@ -22,14 +21,14 @@ const char* token_sensor = "ezFZ9fWSbSBbCVMynTFG";
 const char* token_pulsador = "ptERkUKriZQLQ2Pheiqu";
 const char* token_tracker = "xtq1k3JGjoGNJt86hY0m";
 const char* token_id_user = "218963084";
-#define TOKEN_BOT "5013259796:AAHe5eJAZU4J9vY1FBdiAdoVF-eB88GUY9w"//"2065123278:AAHlaf3gKAg11jGD6aJQuq_hXFX65rE6MZc-684890990" //"5013259796:AAHe5eJAZU4J9vY1FBdiAdoVF-eB88GUY9w"
+#define TOKEN_BOT "2065123278:AAHlaf3gKAg11jGD6aJQuq_hXFX65rE6MZc"
 
 // Sensor 1
-const byte trig1 = 12; //Pin GPIO12 para el Trigger
-const byte echo1 = 14; //Pin GPIO14 para el Echo
+const byte trig1 = 12; //Pin GPIO12 para el Trigger (Blanco)
+const byte echo1 = 14; //Pin GPIO14 para el Echo (Azul)
 // Sensor 2
-const byte trig2 = 27; //Pin GPIO27 para el Trigger
-const byte echo2 = 26; //Pin GPIO26 para el Echo
+const byte trig2 = 27; //Pin GPIO27 para el Trigger (Blanco)
+const byte echo2 = 26; //Pin GPIO26 para el Echo (Azul)
 // Zumbador
 const byte zumbador = 25; //Pin GPIO25 para Zumbador
 // Pulsador
@@ -49,7 +48,7 @@ long dist2; //distancia en cm
 float latitud; // coordenadas latitud
 float longitud; // coordenadas longitud
 bool ubiOK = false; //Bool para verificar la correcta lectra del GPS
-int alturaUser = 175; // Valor por default de la altura
+int alturaUser = 175; // Valor por default de la altura, con este valor, detectará el suelo a una distancia horizontal de 2.8m desde el usuario
 bool commandAltura = false; // Bool para saber si ha introducido el comando /altura en el chatbot
 volatile bool sos = false; //auxiliar para la interrupcion del botón
 uint32_t timer = millis(); //timer para mostrar la ubicación del GPS
@@ -77,7 +76,7 @@ void setup() {
   pinMode(zumbador,OUTPUT);
   
   pinMode(pulsador, INPUT_PULLUP);
-  attachInterrupt(pulsador, interrupt_SOS, FALLING); //Está en low porque tenemos un interruptor y para hacer las pruebas
+  attachInterrupt(pulsador, interrupt_SOS, FALLING);
 
   GPS.begin(9600);
   // Turn on RMC (recommended minimum) and GGA (fix data) including altitude
@@ -97,7 +96,6 @@ void setup() {
   
   botThread.onRun(checkMessages);
   botThread.setInterval(5000); // cada 5s comprueba los mensajes del chatbot
-
 }
 
 
@@ -107,15 +105,16 @@ void setup() {
 void loop() {
 
   ArduinoOTA.handle();
+  
   client.loop();
 
   if(botThread.shouldRun())
     botThread.run();
   
-  dist1 = lecturaDistancia(trig1,echo1);
-  dist2 = lecturaDistancia(trig2,echo2);  
-  avisoZumb(dist1);
-  avisoZumb(dist2);
+  dist1 = lecturaDistancia(trig1,echo1); // TS
+  dist2 = lecturaDistancia(trig2,echo2); // BS
+  
+  riesgoDistancias(dist1, dist2);
   
   mandarDistancia(1,dist1);
   mandarDistancia(2,dist2);
@@ -129,8 +128,6 @@ void loop() {
   }
   
   mandarPulsadorSOS();
-  
-  //delay (1000);
 }
 
 
@@ -138,7 +135,7 @@ void loop() {
  *                                  FUNCIONES                                           *
  ****************************************************************************************/
 
-// ******************************* LECTURA DISTANCIA
+// ******************************************************************** LECTURA DISTANCIA
 long lecturaDistancia(byte trig, byte echo){
   long t;
   
@@ -149,21 +146,39 @@ long lecturaDistancia(byte trig, byte echo){
   return t/59; //Escalamos el tiempo a una distancia en cm
 }
 
-// ************************ ZUMBADOR
-void avisoZumb(long dist){
-  if(dist < 150){
-    Serial.println("Zumbador ON");
-    for(int i=0;i<2;i++){
-      digitalWrite(zumbador,HIGH);
-      delay(100);
-      digitalWrite(zumbador,LOW);
-      delay(100);
-    }
-    digitalWrite(zumbador,LOW);
+// ******************************************************************** RIESGO DISTANCIAS
+void riesgoDistancias(long distTS, long distBS){
+  float alpha = 68.8998; // Ángulo entre el usuario y la direccción del sensor
+  float alturaOmbligo = alturaUser / 1.618; // El valor 1.618 es el número áureo phi=1.61803398... https://www.comocubriruncuerpo.org/medidas-verticales-a-partir-de-la-estatura/
+  long distSegura = alturaOmbligo / cos(alpha);
+
+  if(distTS < 150){
+    Serial.println("Riesgo Distancia TS");
+    avisoZumb();
+  }
+  if(distBS < (distSegura - 7)){
+    Serial.println("Riesgo Distancia BS objeto en el suelo");
+    avisoZumb();
+  }
+  else if(distBS > (distSegura + 5)){
+    Serial.println("Riesgo Distancia BS desnivel o rampa");
+    avisoZumb();
   }
 }
 
-//************************************************ LECTURA UBI
+// ******************************************************************** ZUMBADOR
+void avisoZumb(){
+  Serial.println("Zumbador ON");
+  for(int i=0;i<2;i++){
+    digitalWrite(zumbador,HIGH);
+    delay(100);
+    digitalWrite(zumbador,LOW);
+    delay(100);
+  }
+  digitalWrite(zumbador,LOW);
+}
+
+// ******************************************************************** LECTURA UBI
 void lecturaUbi(){
   while(true){
     // read data from the GPS in the 'main loop'
@@ -198,7 +213,7 @@ void lecturaUbi(){
   }
 }
 
-//******************************** MANDAR DISTANCIA
+// ******************************************************************** MANDAR DISTANCIA
 void mandarDistancia(int sensor, int distancia){
   char buf2[50];
   const char* fin = "}";
@@ -206,9 +221,9 @@ void mandarDistancia(int sensor, int distancia){
 
   if (client.connect("Sensor Distancia",token_sensor,"")) {
       Serial.println("Connected Sensor Distancia");
-    }
+  }
 
-  if(sensor == 1){ // 1 - Sensor de arriba
+  if(sensor == 1){ // 1 - Sensor de arriba TS
     buf = "{\"distance_TS\":";
 
     buf.concat(distancia);
@@ -220,7 +235,7 @@ void mandarDistancia(int sensor, int distancia){
       Serial.println("OK");
     }
   }
-  else if (sensor == 2){ // 2 - Sensor de abajo
+  else if (sensor == 2){ // 2 - Sensor de abajo BS
     buf = "{\"distance_BS\":";
     buf.concat(distancia);
     buf.concat(fin);
@@ -234,7 +249,7 @@ void mandarDistancia(int sensor, int distancia){
   client.disconnect();
 } 
 
-//************************** MANDAR PULSADOR
+// ******************************************************************** MANDAR PULSADOR
 void mandarPulsadorSOS(){
   String buf = "{\"SOS\":";
   const char* fin ="}"; 
@@ -259,7 +274,7 @@ void mandarPulsadorSOS(){
   sos = false;
 }
 
-// *********************** MANDAR UBI
+// ******************************************************************** MANDAR UBI
 void mandarUbi(){  
   String buf;
   char buf2[100];
@@ -270,8 +285,8 @@ void mandarUbi(){
   if (client.connect("Tracker",token_tracker,"")) {
     Serial.println("Connected Tracker");
   }
-  buf.concat(latitud); //latitud 
-  buf_aux.concat(longitud); //longitud
+  buf.concat(latitud);
+  buf_aux.concat(longitud);
   buf.concat(buf_aux);
   buf.concat(fin);
   Serial.print("Enviado: ");
@@ -283,7 +298,7 @@ void mandarUbi(){
   client.disconnect();
 }
 
-//*********************************** BOT SETUP
+// ******************************************************************** BOT SETUP
 void bot_setup()
 {
   const String commands = F("["
@@ -294,7 +309,7 @@ void bot_setup()
                             "]");
   bot.setMyCommands(commands);
 }
-//******************************** HANDLE NEW MESSAGES
+// ******************************************************************** HANDLE NEW MESSAGES
 void handleNewMessages(int numNewMessages){
   Serial.println("handleNewMessages");
   Serial.println(numNewMessages);
@@ -335,7 +350,7 @@ void handleNewMessages(int numNewMessages){
   }
 }
 
-//******************************************COMPROBAR MSG
+// ******************************************************************** COMPROBAR MSG
 void checkMessages(){
   Serial.println("Check");
   int numNewMessages = bot.getUpdates(bot.last_message_received + 1);
@@ -346,9 +361,9 @@ void checkMessages(){
   }
 }
 
-/******************************************************************** 
- *                        INTERRUPT                                 *
- ********************************************************************/
+/********************************************************************* 
+ *                           INTERRUPT                               *
+ *********************************************************************/
 void interrupt_SOS(){
   Serial.println("Interrupt");
   sos = true;
